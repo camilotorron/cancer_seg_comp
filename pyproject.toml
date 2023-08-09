@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "cancer-seg-comp"
+version = "0.1.0"
+description = ""
+authors = ["camilotorron <camilo_torron@hotmail.com>"]
+readme = "README.md"
+packages = [{include = "cancer_seg_comp"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+ultralytics = "^8.0.148"
+torch = "1.13.1"
+pydantic = "1.10.4"
+python-dotenv = "^1.0.0"
+pandas = "^2.0.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -3,7 +3,7 @@ data/
 scripts/*
 TODO.txt
 *.ipynb
-
+runs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

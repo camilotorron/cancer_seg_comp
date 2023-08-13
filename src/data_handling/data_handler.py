@@ -56,6 +56,10 @@ class DataHandler:
             b_boxes = [self.get_bounding_box(mask_path) for mask_path in masks_paths]
             bboxs.append(b_boxes)
         df["bboxs"] = bboxs
+
+        df["image_size"] = df["file"].apply(self.get_image_size)
+        df["yolo_bbox"] = df.apply(self.bbox_to_yoloformat, axis=1)
+
         return df
 
     def get_bounding_box(self, mask_path) -> tuple:
@@ -75,3 +79,27 @@ class DataHandler:
 
             bbox = x_min, x_max, y_min, y_max
         return bbox
+
+    def get_image_size(self, filepath: str):
+        with Image.open(filepath) as img:
+            return img.size  # width, height
+
+    def bbox_to_yoloformat(self, row):
+        bboxs = row["bboxs"]
+        imgsz = row["image_size"]
+        yolo_bboxs = []
+        for bbox in bboxs:
+            x_min, x_max, y_min, y_max = bbox
+            x_center = (x_min + x_max) / 2
+            y_center = (y_min + y_max) / 2
+            width = x_max - x_min
+            height = y_max - y_min
+
+            x_center_n = x_center / imgsz[0]
+            y_center_n = y_center / imgsz[1]
+            width_n = width / imgsz[0]
+            height_n = height / imgsz[1]
+
+            yolo_bbox = (x_center_n, y_center_n, width_n, height_n)
+            yolo_bboxs.append(yolo_bbox)
+        return yolo_bboxs

@@ -9,7 +9,10 @@ class Yolo:
 
         print(type(self.model))
 
-    def train(self):
+    def train(self, data: str, epochs: int = 30, imgsz: int = 640):
+        self.model.train(data=data, epochs=epochs, imgsz=imgsz, device=0)
+
+    def train_ex(self):
         self.model.train(data="coco128.yaml", epochs=3)  # train the model
         metrics = self.model.val()  # evaluate model performance on the validation set
         results = self.model(

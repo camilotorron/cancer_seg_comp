@@ -1,5 +1,6 @@
 from src.settings.settings import env
 import os
+import shutil
 import pandas as pd
 import numpy as np
 from PIL import Image
@@ -103,3 +104,64 @@ class DataHandler:
             yolo_bbox = (x_center_n, y_center_n, width_n, height_n)
             yolo_bboxs.append(yolo_bbox)
         return yolo_bboxs
+
+    def organize_images(
+        self,
+        df: pd.DataFrame,
+        data_folder: str = None,
+        BASE_DIR: str = env.YOLO_DATASET_OUTPUT,
+    ) -> None:
+        if not data_folder:
+            data_folder = f"{self.IMAGES_PATH}/{env.BREAST_US}"
+        if not os.path.exists(BASE_DIR):
+            os.makedirs(BASE_DIR)
+
+        subdirs = ["train", "val", "test"]
+        train_count, val_count, test_count = 0, 0, 0
+        for subdir in subdirs:
+            os.makedirs(os.path.join(BASE_DIR, subdir), exist_ok=True)
+
+        for _, row in df.iterrows():
+            split_value = row["split"]
+            if split_value not in subdirs:
+                raise ValueError(f"Invalid split value: {split_value}")
+            if split_value == "train":
+                train_count += 1
+            elif split_value == "val":
+                val_count += 1
+            elif split_value == "test":
+                test_count += 1
+            source_image_path = row["file"]
+            destination_path = os.path.join(
+                BASE_DIR, split_value, os.path.basename(row["filename"])
+            )
+            shutil.copy2(source_image_path, destination_path)
+        print(
+            f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}"
+        )
+
+    def create_anotations_txt(self, df: pd.DataFrame):
+        for _, row in df.iterrows():
+            output_path = env.YOLO_DATASET_OUTPUT + "/" + row["split"]
+            filename = row["filename"]
+            diagnostic = env.labels_dict.get(row["diagnostic"])
+            texts = []
+            print("................................")
+            print(output_path)
+            print(filename)
+            for bbox in row["yolo_bbox"]:
+                box = output = " ".join(map(str, bbox))
+                text = f"{diagnostic} {box}"
+                texts.append(text)
+            self.write_to_txt(lines=texts, filename=filename, output_path=output_path)
+
+    def write_to_txt(self, lines: list, filename: str, output_path: str = ".") -> None:
+        text = "\n".join(lines)
+        base_name = filename.split(".")[0]
+        filename = f"{base_name}.txt"
+        full_path = os.path.join(output_path, filename)
+        print(text)
+        print(filename)
+        print(full_path)
+        with open(full_path, "w") as file:
+            file.write(text)

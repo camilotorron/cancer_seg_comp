@@ -12,6 +12,8 @@ class Environment(BaseSettings):
     BREAST_US: str = "breast_ultrasound_images_dataset/Dataset_BUSI_with_GT_proc"
     YOLO_DATASET_OUTPUT: str = str(Path("data/yolo_ouput_dataset").resolve())
     labels_dict = {"benign": 0, "normal": 1, "malignant": 2}
+    DEF_YOLO_DET_THRESHOLD = 0.5
+    FINETUNED_YOLO = "models/finetuned_yolo.pt"
 
 
 env = Environment()

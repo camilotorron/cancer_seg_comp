@@ -8,8 +8,11 @@ from PIL import Image
 
 class DataHandler:
     IMAGES_PATH: str
+    df: pd.DataFrame
 
-    def __init__(self):
+    def __init__(self, df_path: str = None):
+        if df_path is not None:
+            self.df = pd.read_csv(df_path)
         self.IMAGES_PATH = env.IMAGES_PATH
 
     def read_data(self, data_split: list = [0.6, 0.2, 0.2]):
@@ -61,7 +64,7 @@ class DataHandler:
         df["image_size"] = df["file"].apply(self.get_image_size)
         df["yolo_bbox"] = df.apply(self.bbox_to_yoloformat, axis=1)
 
-        return df
+        self.df = df
 
     def get_bounding_box(self, mask_path) -> tuple:
         mask = Image.open(mask_path)
@@ -121,7 +124,7 @@ class DataHandler:
         for subdir in subdirs:
             os.makedirs(os.path.join(BASE_DIR, subdir), exist_ok=True)
 
-        for _, row in df.iterrows():
+        for index, row in df.iterrows():
             split_value = row["split"]
             if split_value not in subdirs:
                 raise ValueError(f"Invalid split value: {split_value}")
@@ -135,13 +138,15 @@ class DataHandler:
             destination_path = os.path.join(
                 BASE_DIR, split_value, os.path.basename(row["filename"])
             )
+            df.at[index, "yolo_ds_original_image_path"] = destination_path
             shutil.copy2(source_image_path, destination_path)
         print(
             f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}"
         )
+        self.df = df
 
     def create_anotations_txt(self, df: pd.DataFrame):
-        for _, row in df.iterrows():
+        for index, row in df.iterrows():
             output_path = env.YOLO_DATASET_OUTPUT + "/" + row["split"]
             filename = row["filename"]
             diagnostic = env.labels_dict.get(row["diagnostic"])
@@ -153,9 +158,13 @@ class DataHandler:
                 box = output = " ".join(map(str, bbox))
                 text = f"{diagnostic} {box}"
                 texts.append(text)
-            self.write_to_txt(lines=texts, filename=filename, output_path=output_path)
+            destination_path = self.write_to_txt(
+                lines=texts, filename=filename, output_path=output_path
+            )
+            df.at[index, "yolo_ds_annot_txt_path"] = destination_path
+        self.df = df
 
-    def write_to_txt(self, lines: list, filename: str, output_path: str = ".") -> None:
+    def write_to_txt(self, lines: list, filename: str, output_path: str = ".") -> str:
         text = "\n".join(lines)
         base_name = filename.split(".")[0]
         filename = f"{base_name}.txt"
@@ -165,3 +174,7 @@ class DataHandler:
         print(full_path)
         with open(full_path, "w") as file:
             file.write(text)
+        return full_path
+
+    def export_df_to_csv(self):
+        self.df.to_csv("data/data.csv")

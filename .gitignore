@@ -5,6 +5,10 @@ TODO.txt
 *.ipynb
 runs
 models
+*.png
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

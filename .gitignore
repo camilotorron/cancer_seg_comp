@@ -1,4 +1,5 @@
 data/
+data2/
 *.pt
 scripts/*
 TODO.txt
@@ -6,7 +7,7 @@ TODO.txt
 runs
 models
 *.png
-
+*.tif
 
 
 # Byte-compiled / optimized / DLL files

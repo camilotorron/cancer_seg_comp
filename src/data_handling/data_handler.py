@@ -150,12 +150,14 @@ class DataHandler:
             output_path = env.YOLO_DATASET_OUTPUT + "/" + row["split"]
             filename = row["filename"]
             diagnostic = env.labels_dict.get(row["diagnostic"])
+            if diagnostic == 2:
+                continue
             texts = []
             print("................................")
             print(output_path)
             print(filename)
             for bbox in row["yolo_bbox"]:
-                box = output = " ".join(map(str, bbox))
+                box = " ".join(map(str, bbox))
                 text = f"{diagnostic} {box}"
                 texts.append(text)
             destination_path = self.write_to_txt(

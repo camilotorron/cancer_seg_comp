@@ -8,7 +8,7 @@ runs
 models
 *.png
 *.tif
-
+*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

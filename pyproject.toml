@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "cancer-seg-comp"
+version = "0.1.0"
+description = ""
+authors = ["camilotorron <camilo_torron@hotmail.com>"]
+readme = "README.md"
+packages = [{include = "cancer_seg_comp"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.11"
+ultralytics = "^8.0.148"
+torch = "1.13.1"
+pydantic = "1.10.4"
+python-dotenv = "^1.0.0"
+pandas = "^2.0.3"
+segment-anything = {git = "https://github.com/facebookresearch/segment-anything.git"}
+opencv-python = "^4.8.0.76"
+pycocotools = "^2.0.7"
+matplotlib = "^3.7.2"
+onnxruntime = "^1.15.1"
+onnx = "^1.14.0"
+scikit-learn = "^1.3.0"
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

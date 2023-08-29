@@ -20,6 +20,9 @@ class Environment(BaseSettings):
     FINETUNED_YOLO = "models/finetuned_yolo.pt"
     BRAIN_DATA = "brain_MRI_segmentation/kaggle_3m_png"
     # BRAIN_DATA = "brain_MRI_segmentation/kaggle_3m"
+    BRAIN_DATA_DIR = "datasets/brain"
+    SUB_DATASETS = ["original", "original_png", "yolo_det", "yolo_seg"]
+    YOLOSEG_THRESHOLD = 0.5
 
 
 env = Environment()

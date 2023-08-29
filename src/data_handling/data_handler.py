@@ -108,7 +108,7 @@ class DataHandler:
             yolo_bboxs.append(yolo_bbox)
         return yolo_bboxs
 
-    def organize_images(
+    def create_yolo_det_dataset(
         self,
         df: pd.DataFrame,
         data_folder: str = None,
@@ -180,3 +180,6 @@ class DataHandler:
 
     def export_df_to_csv(self):
         self.df.to_csv("data/data.csv")
+
+    def create_yolo_seg_dataset(self):
+        pass

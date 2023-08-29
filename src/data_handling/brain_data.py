@@ -3,10 +3,11 @@ import os
 import shutil
 import pandas as pd
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 from pathlib import Path
 from typing import List
 from src.data_handling.bbox import Bbox
+import tqdm
 
 
 class BrainData:
@@ -17,11 +18,14 @@ class BrainData:
         if df_path is not None:
             self.df = pd.read_csv(df_path)
 
-        self.IMAGES_PATH = Path(env.IMAGES_PATH).joinpath(env.BRAIN_DATA)
+        self.IMAGES_PATH = env.BRAIN_DATA_DIR
 
     def read_data(self, data_split: List = [0.6, 0.2, 0.2]):
         # read data
-        files = self.get_png_files(path=str(self.IMAGES_PATH))
+        original_path = str(
+            Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[1]).resolve()
+        )
+        files = self.get_png_files(path=original_path)
         df = pd.DataFrame({"file": files})
         df["dir"], df["filename"] = zip(
             *df["file"].apply(lambda x: (x.rsplit("/", 1)[0], x.rsplit("/", 1)[1]))
@@ -63,8 +67,9 @@ class BrainData:
         df["bbox"] = bboxs
 
         df["yolo_bbox"] = df.apply(self.bbox_to_yoloformat, axis=1)
-        df["is_tumor"] = df["bbox"] != (0, 0, 0, 0)
-
+        for i, row in df.iterrows():
+            df.loc[i, "is_tumor"] = row["bbox"] != (0, 0, 0, 0)
+        self.df = df
         return df
 
     def get_tif_files(self, path):
@@ -135,7 +140,7 @@ class BrainData:
 
         return yolo_bbox
 
-    def organize_images(
+    def create_yolo_det_dataset(
         self,
         df: pd.DataFrame,
         data_folder: str = None,
@@ -172,7 +177,7 @@ class BrainData:
         )
         self.df = df
 
-    def create_anotations_txt(self, df: pd.DataFrame, output_dir: str):
+    def create_det_anotations_txt(self, df: pd.DataFrame, output_dir: str):
         for index, row in df.iterrows():
             output_path = output_dir + "/" + row["split"]
             filename = row["filename"]
@@ -225,11 +230,115 @@ class BrainData:
                     img = Image.open(full_path)
                     img.save(dest_path, "PNG")
 
-    def export_df_to_csv(self):
-        self.df.to_csv("data2/data.csv")
+    def export_df_to_csv(self, destination: str):
+        path = destination
+        self.df.to_csv(path)
+        return path
 
     def create_img(self, mask, name):
         breakpoint()
         img = Image.fromarray(np.uint8(mask), "RGB")
         filename = f"outputs/{name}.png"
         img.save(filename)
+
+    def create_yolo_seg_dataset(self, out_dir=None):
+        if out_dir == None:
+            out_dir = Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[3])
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+
+        subdirs = ["train", "val", "test"]
+        train_count, val_count, test_count = 0, 0, 0
+
+        for subdir in subdirs:
+            os.makedirs(os.path.join(out_dir, subdir), exist_ok=True)
+
+        for index, row in self.df.iterrows():
+            split_value = row["split"]
+            if split_value not in subdirs:
+                raise ValueError(f"Invalid split value: {split_value}")
+            if split_value == "train":
+                train_count += 1
+            elif split_value == "val":
+                val_count += 1
+            elif split_value == "test":
+                test_count += 1
+            source_image_path = f'{row["dir"]}/{row["filename"]}'
+            destination_path = os.path.join(
+                out_dir, split_value, os.path.basename(row["filename"])
+            )
+            self.df.at[index, "yolo_seg_ds_original_image_path"] = destination_path
+            shutil.copy2(source_image_path, destination_path)
+        print(
+            f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}"
+        )
+
+    def create_seg_anotations_txt(self, out_dir=None):
+        if out_dir == None:
+            out_dir = Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[3])
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        self.df["seg_anot_filepath"] = None
+        for index, row in self.df.iterrows():
+            print(f"File {index}/{len(self.df)}")
+            # if row["split"] == "train":
+            original_path = row["yolo_seg_ds_original_image_path"]
+            mask_path = f'{row["dir"]}/{row["mask"]}'
+
+            if not self._check_all_black_mask(mask_path=mask_path):
+                text = f"0 {self._create_seg_text_anot(mask_path = mask_path)}"
+                anot_file = self._create_seg_text_file(lines=text, row=row)
+                self.df.loc[index, "seg_anot_filepath"] = anot_file
+
+    def _check_all_black_mask(self, mask_path: str) -> bool:
+        img = Image.open(mask_path).convert("L")
+        img_np = np.array(img)
+        return np.all(img_np == 0)
+
+    def _create_seg_text_anot(self, mask_path: str):
+        img = Image.open(mask_path).convert("L")
+        img_np = np.array(img)
+        # Binarize the image if needed
+        is_binary = all(val in [0, 255] for val in np.unique(img_np))
+        if not is_binary:
+            img_np[img_np < 128] = 0
+            img_np[img_np >= 128] = 255
+
+        # Image.open(mask_path).show()
+        img = Image.open(mask_path).convert("RGB")
+
+        # Find contour points
+        contour_points = []
+        for i in range(1, img_np.shape[0] - 1):
+            for j in range(1, img_np.shape[1] - 1):
+                center = img_np[i, j]
+                neighbors = [
+                    img_np[i - 1, j - 1],
+                    img_np[i - 1, j],
+                    img_np[i - 1, j + 1],
+                    img_np[i, j - 1],
+                    img_np[i, j + 1],
+                    img_np[i + 1, j - 1],
+                    img_np[i + 1, j],
+                    img_np[i + 1, j + 1],
+                ]
+
+                # Check if this point is a contour point (boundary between black and white)
+                if all(val == center for val in neighbors):
+                    continue
+                contour_points.append((j, i))
+        size = img_np.shape
+        text = " ".join(
+            "{} {}".format(x / size[0], y / size[1]) for x, y in contour_points
+        )
+        return text
+
+    def _create_seg_text_file(self, lines: str | list, row=None):
+        if isinstance(lines, str):
+            text = lines
+        if row is not None:
+            basename = row["yolo_seg_ds_original_image_path"].split(".")[0]
+            filename = f"{basename}.txt"
+            with open(filename, "w") as file:
+                file.write(text)
+            return filename

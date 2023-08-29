@@ -13,9 +13,13 @@ class YoloSam:
         self.yolo = Yolo()
         self.sam = Sam()
 
-    def inference(self, image: Union[str, np.array], save: bool = False):
+    def inference(
+        self, image: Union[str, np.array], save: bool = False, checkout_path: str = ""
+    ):
         results = []
-        bboxs, confidences, pred_diags = self.yolo.inference(image=image)
+        bboxs, confidences, pred_diags = self.yolo.inference(
+            image=image, checkout_path=checkout_path
+        )
 
         if len(bboxs) > 0:
             for i, bbox in enumerate(bboxs):

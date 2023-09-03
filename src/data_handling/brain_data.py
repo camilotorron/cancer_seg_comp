@@ -7,20 +7,41 @@ from PIL import Image, ImageDraw
 from pathlib import Path
 from typing import List
 from src.data_handling.bbox import Bbox
-import tqdm
+from tqdm import tqdm
+import json
+from src.data_handling.data_augmentator import DataAugmentator
+import math
 
 
 class BrainData:
     IMAGES_PATH: str
     df: pd.DataFrame
+    augment: bool
+    augmented_dataset_path: str = ""
+    augment_scale: int = 1
 
-    def __init__(self, df_path: str = None):
+    def __init__(
+        self,
+        df_path: str = None,
+        augment: bool = False,
+        augmented_path: str = "",
+        augment_scale: int = 20,
+    ):
         if df_path is not None:
             self.df = pd.read_csv(df_path)
 
         self.IMAGES_PATH = env.BRAIN_DATA_DIR
+        self.augment = augment
+        self.augmented_dataset_path = augmented_path
+        self.augment_scale = augment_scale
 
-    def read_data(self, data_split: List = [0.6, 0.2, 0.2]):
+    def read_data(self):
+        if self.augment:
+            self.read_augment_data()
+        else:
+            self.read_base_data()
+
+    def read_base_data(self, data_split: List = [0.6, 0.2, 0.2]):
         # read data
         original_path = str(
             Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[1]).resolve()
@@ -342,3 +363,197 @@ class BrainData:
             with open(filename, "w") as file:
                 file.write(text)
             return filename
+
+    def create_det_coco_datasets(self, out_dir=None):
+        if out_dir is None:
+            out_dir = env.SUB_DATASETS[4]
+        # Add index column
+        self.df.insert(0, "index", self.df.index)
+
+        train_images, test_images, train_annots, test_annots = [], [], [], []
+        for i, row in self.df.iterrows():
+            if row["is_tumor"]:
+                original_path = f"{row['dir']}/{row['filename']}"
+                image_dict = {
+                    "id": int(row["index"]),
+                    "file_name": original_path,
+                    "height": int(row["image_size"][0]),
+                    "width": int(row["image_size"][1]),
+                }
+                area = (row["bbox"][1] - row["bbox"][0]) * (
+                    row["bbox"][-1] - row["bbox"][-2]
+                )
+                annot_dict = (
+                    {
+                        "id": int(row["index"]),
+                        "image_id": int(row["index"]),
+                        "category_id": 0,
+                        "bbox": [int(x) for x in row["bbox"]],
+                        "area": area,
+                        "iscrowd": 0,
+                    },
+                )
+                if row["split"] != "test":
+                    train_images.append(image_dict)
+                    train_annots.append(annot_dict)
+                else:
+                    test_images.append(image_dict)
+                    test_annots.append(annot_dict)
+        train_json: dict = self._create_det_coco_annot_json(
+            images=train_images, annots=train_annots
+        )
+        test_json: dict = self._create_det_coco_annot_json(
+            images=test_images, annots=test_annots
+        )
+        # create outputs json's and return its paths
+        path = f"{self.IMAGES_PATH}/{out_dir}"
+        if not os.path.exists(path):
+            os.makedirs(path)
+        train_json_path = f"{path}/train_json.json"
+        test_json_path = f"{path}/test_json.json"
+        with open(train_json_path, "w") as json_file:
+            json.dump(train_json, json_file)
+        with open(test_json_path, "w") as json_file:
+            json.dump(test_json, json_file)
+        return train_json_path, test_json_path
+
+    def _create_det_coco_annot_json(self, images: list, annots: list) -> dict:
+        return {
+            "info": {
+                "year": "2023",
+                "version": "1.0",
+                "description": "Brain data object detection",
+                "contributor": "camilo.torron",
+            },
+            "categories": [
+                {"id": 0, "name": "tumor"},
+            ],
+            "images": images,
+            "annotations": annots,
+        }
+
+    def read_augment_data(self, data_split: list = [0.6, 0.2, 0.2]):
+        # create augmented dir
+        if not os.path.exists(self.augmented_dataset_path):
+            os.makedirs(self.augmented_dataset_path)
+
+        original_path = str(
+            Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[1]).resolve()
+        )
+        files = self.get_png_files(path=original_path)
+
+        for file in files:
+            file_name = file.split("/")[-1]
+            destination_path = f"{self.augmented_dataset_path}/{file_name}"
+            shutil.copy2(file, destination_path)
+
+        files = self.get_png_files(path=self.augmented_dataset_path)
+
+        df = pd.DataFrame({"file": files})
+        df["dir"], df["filename"] = zip(
+            *df["file"].apply(lambda x: (x.rsplit("/", 1)[0], x.rsplit("/", 1)[1]))
+        )
+        df.drop(columns=["file"], inplace=True)
+        df["mask"] = None
+        for index, row in df.iterrows():
+            if "_mask" not in row["filename"]:
+                mask_name = row["filename"].replace(".png", "_mask")
+
+                masks = []
+                for f in df["filename"].values:
+                    if mask_name in f:
+                        masks.append(f)
+                df.at[index, "mask"] = masks
+
+        df = df[~df["filename"].str.contains("_mask")]
+        df["mask"] = df["mask"].apply(lambda x: x[0] if len(x) > 0 else None)
+
+        df.reset_index(drop=True, inplace=True)
+
+        # augment and balance data
+        # Create a new column 'is_tumor'
+        df["is_tumor"] = df.apply(
+            lambda row: self.is_tumor(f'{row["dir"]}/{row["mask"]}'), axis=1
+        )
+
+        tumor_images = df["is_tumor"].value_counts().get(True, 0)
+        not_tumor_images = df["is_tumor"].value_counts().get(False, 0)
+
+        positive_factor = math.ceil(
+            (self.augment_scale * (tumor_images + not_tumor_images))
+            / (2 * tumor_images)
+        )  # How much augment the positive class to have balances dataset
+
+        negative_factor = math.ceil(
+            (self.augment_scale * (tumor_images + not_tumor_images))
+            / (2 * not_tumor_images)
+        )  # How much augment the negative class to have balances dataset
+        previous_len = len(df)
+        print("Augmenting images...")
+        for i, row in tqdm(df.iterrows(), total=len(df)):
+            file_path = f"{row['dir']}/{row['filename']}"
+            mask_path = f"{row['dir']}/{row['mask']}"
+
+            augment_factor = (
+                positive_factor if row["is_tumor"] == True else negative_factor
+            )
+
+            daug = DataAugmentator(
+                original_image=file_path,
+                mask_image=mask_path,
+                output_folder=self.augmented_dataset_path,
+                num_augmentations=augment_factor,
+            )
+            augmented_images, augmented_masks = daug.apply_augmentations()
+
+            # append new images and masks to df
+            for image, mask in zip(augmented_images, augmented_masks):
+                dir = "/".join(image.split("/")[:-1])
+                file_name = image.split("/")[-1]
+                mask_name = mask.split("/")[-1]
+                is_tumor = self.is_tumor(mask)
+                new_row = {
+                    "dir": dir,
+                    "filename": file_name,
+                    "mask": mask_name,
+                    "is_tumor": is_tumor,
+                }
+                df = df._append(new_row, ignore_index=True)
+        augmented_len = len(df)
+        print(f"Previous length: {previous_len}   Augmented length: {augmented_len}")
+        splits = np.random.choice(
+            ["train", "val", "test"],
+            size=len(df),
+            p=[data_split[0], data_split[1], data_split[2]],
+        )
+        df["split"] = splits
+
+        image_sizes, bboxs = [], []
+        print("Computing BBoxes...")
+        for i, row in tqdm(df.iterrows(), total=len(df)):
+            mask_path = f"{row['dir']}/{row['mask']}"
+            file_path = f"{row['dir']}/{row['filename']}"
+            # compute img size
+            img_size = self.get_image_size(file_path)
+            image_sizes.append(img_size)
+            # compute bbox
+            bbox = self.get_bounding_box(mask_path)
+            bboxs.append(bbox)
+        df["image_size"] = image_sizes
+        df["bbox"] = bboxs
+
+        df["yolo_bbox"] = df.apply(self.bbox_to_yoloformat, axis=1)
+        for i, row in df.iterrows():
+            df.loc[i, "is_tumor"] = row["bbox"] != (0, 0, 0, 0)
+        self.df = df
+
+    def is_tumor(self, mask_path):
+        mask = Image.open(mask_path)
+        mask_np = np.array(mask)
+
+        # unique_values = np.unique(mask_np)
+        # print(unique_values)
+        # breakpoint()
+        if np.sum(mask_np) == 0:
+            return False
+        return True

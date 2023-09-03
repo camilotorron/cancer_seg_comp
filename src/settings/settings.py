@@ -21,8 +21,17 @@ class Environment(BaseSettings):
     BRAIN_DATA = "brain_MRI_segmentation/kaggle_3m_png"
     # BRAIN_DATA = "brain_MRI_segmentation/kaggle_3m"
     BRAIN_DATA_DIR = "datasets/brain"
-    SUB_DATASETS = ["original", "original_png", "yolo_det", "yolo_seg"]
+    SUB_DATASETS = [
+        "original",
+        "original_png",
+        "yolo_det",
+        "yolo_seg",
+        "coco",
+        "yolo_det_aug",
+        "yolo_seg_aug",
+    ]
     YOLOSEG_THRESHOLD = 0.5
+    MEDSAM_PATH = "wanglab/medsam-vit-base"  # path for SamProcessor and SamModel
 
 
 env = Environment()

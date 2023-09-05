@@ -1,9 +1,10 @@
 from src.settings.settings import env
 import os
 import shutil
+from PIL import Image
 import pandas as pd
 import numpy as np
-from PIL import Image
+
 from pathlib import Path
 from typing import List
 from tqdm import tqdm

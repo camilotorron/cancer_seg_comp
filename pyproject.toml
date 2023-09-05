@@ -28,3 +28,13 @@ pre-commit = "^3.4.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+# https://github.com/psf/black
+line-length = 120
+target-version = ["py310"]
+
+[tool.isort]
+# https://github.com/timothycrosley/isort/
+atomic = true
+profile = "black"

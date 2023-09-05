@@ -1,17 +1,18 @@
-from src.settings.settings import env
+import json
 import os
 import shutil
-from PIL import Image
-import pandas as pd
-import numpy as np
-
 from pathlib import Path
 from typing import List
-from tqdm import tqdm
-import json
-from src.data_handling.data_augmentator import DataAugmentator
+
+import numpy as np
+import pandas as pd
 from loguru import logger
-from src.tools.tools import get_png_files, get_image_size, check_is_tumor
+from PIL import Image
+from tqdm import tqdm
+
+from src.data_handling.data_augmentator import DataAugmentator
+from src.settings.settings import env
+from src.tools.tools import check_is_tumor, get_image_size, get_png_files
 
 
 class BrainData:
@@ -35,9 +36,7 @@ class BrainData:
         self.IMAGES_PATH = env.BRAIN_DATA_DIR
         self.augment_dict = augment_dict
         if augment_dict is not None:
-            self.augmented_dataset_path = self.augment_dict.get(
-                "augmented_dataset_path"
-            )
+            self.augmented_dataset_path = self.augment_dict.get("augmented_dataset_path")
             self.augment_scale = self.augment_dict.get("augment_scale")
 
     def read_data(self) -> None:
@@ -58,14 +57,10 @@ class BrainData:
             data_split (List, optional): splits for [train, val, test]. Defaults to [0.6, 0.2, 0.2].
         """
         # read data
-        original_path = str(
-            Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[1]).resolve()
-        )
+        original_path = str(Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[1]).resolve())
         files = get_png_files(path=original_path)
         df = pd.DataFrame({"file": files})
-        df["dir"], df["filename"] = zip(
-            *df["file"].apply(lambda x: (x.rsplit("/", 1)[0], x.rsplit("/", 1)[1]))
-        )
+        df["dir"], df["filename"] = zip(*df["file"].apply(lambda x: (x.rsplit("/", 1)[0], x.rsplit("/", 1)[1])))
         df.drop(columns=["file"], inplace=True)
         df["mask"] = None
         for index, row in df.iterrows():
@@ -123,9 +118,7 @@ class BrainData:
         if not os.path.exists(self.augmented_dataset_path):
             os.makedirs(self.augmented_dataset_path)
 
-        original_path = str(
-            Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[1]).resolve()
-        )
+        original_path = str(Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[1]).resolve())
         files = get_png_files(path=original_path)
 
         for file in files:
@@ -136,9 +129,7 @@ class BrainData:
         files = get_png_files(path=self.augmented_dataset_path)
 
         df = pd.DataFrame({"file": files})
-        df["dir"], df["filename"] = zip(
-            *df["file"].apply(lambda x: (x.rsplit("/", 1)[0], x.rsplit("/", 1)[1]))
-        )
+        df["dir"], df["filename"] = zip(*df["file"].apply(lambda x: (x.rsplit("/", 1)[0], x.rsplit("/", 1)[1])))
         df.drop(columns=["file"], inplace=True)
         df["mask"] = None
         for index, row in df.iterrows():
@@ -166,13 +157,11 @@ class BrainData:
         not_tumor_images = df["is_tumor"].value_counts().get(False, 0)
 
         positive_factor = round(
-            (self.augment_scale * (tumor_images + not_tumor_images))
-            / (2 * tumor_images)
+            (self.augment_scale * (tumor_images + not_tumor_images)) / (2 * tumor_images)
         )  # How much augment the positive class to have balances dataset
 
         negative_factor = round(
-            (self.augment_scale * (tumor_images + not_tumor_images))
-            / (2 * not_tumor_images)
+            (self.augment_scale * (tumor_images + not_tumor_images)) / (2 * not_tumor_images)
         )  # How much augment the negative class to have balances dataset
         previous_len = len(df)
         logger.debug("Augmenting images...")
@@ -180,9 +169,7 @@ class BrainData:
             file_path = f"{row['dir']}/{row['filename']}"
             mask_path = f"{row['dir']}/{row['mask']}"
 
-            augment_factor = (
-                positive_factor if row["is_tumor"] == True else negative_factor
-            )
+            augment_factor = positive_factor if row["is_tumor"] == True else negative_factor
 
             daug = DataAugmentator(
                 original_image=file_path,
@@ -248,11 +235,7 @@ class BrainData:
         segmentation = np.where(binarized_array == True)
 
         x_min, x_max, y_min, y_max = 0, 0, 0, 0
-        if (
-            len(segmentation) != 0
-            and len(segmentation[1]) != 0
-            and len(segmentation[0]) != 0
-        ):
+        if len(segmentation) != 0 and len(segmentation[1]) != 0 and len(segmentation[0]) != 0:
             x_min = int(np.min(segmentation[1]))
             x_max = int(np.max(segmentation[1]))
             y_min = int(np.min(segmentation[0]))
@@ -306,14 +289,10 @@ class BrainData:
             elif split_value == "test":
                 test_count += 1
             source_image_path = f'{row["dir"]}/{row["filename"]}'
-            destination_path = os.path.join(
-                BASE_DIR, split_value, os.path.basename(row["filename"])
-            )
+            destination_path = os.path.join(BASE_DIR, split_value, os.path.basename(row["filename"]))
             df.at[index, "yolo_ds_original_image_path"] = destination_path
             shutil.copy2(source_image_path, destination_path)
-        logger.debug(
-            f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}"
-        )
+        logger.debug(f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}")
         self.df = df
 
     def create_det_anotations_txt(self, df: pd.DataFrame, output_dir: str):
@@ -324,9 +303,7 @@ class BrainData:
                 box = " ".join(map(str, row["yolo_bbox"]))
                 text = f"{0} {box}"
 
-                destination_path = self.write_to_txt(
-                    lines=text, filename=filename, output_path=output_path
-                )
+                destination_path = self.write_to_txt(lines=text, filename=filename, output_path=output_path)
                 df.at[index, "yolo_ds_annot_txt_path"] = destination_path
         self.df = df
 
@@ -397,14 +374,10 @@ class BrainData:
             elif split_value == "test":
                 test_count += 1
             source_image_path = f'{row["dir"]}/{row["filename"]}'
-            destination_path = os.path.join(
-                out_dir, split_value, os.path.basename(row["filename"])
-            )
+            destination_path = os.path.join(out_dir, split_value, os.path.basename(row["filename"]))
             self.df.at[index, "yolo_seg_ds_original_image_path"] = destination_path
             shutil.copy2(source_image_path, destination_path)
-        logger.debug(
-            f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}"
-        )
+        logger.debug(f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}")
 
     def create_seg_anotations_txt(self, out_dir=None):
         if out_dir == None:
@@ -461,9 +434,7 @@ class BrainData:
                     continue
                 contour_points.append((j, i))
         size = img_np.shape
-        text = " ".join(
-            "{} {}".format(x / size[0], y / size[1]) for x, y in contour_points
-        )
+        text = " ".join("{} {}".format(x / size[0], y / size[1]) for x, y in contour_points)
         return text
 
     def _create_seg_text_file(self, lines: str | list, row=None):
@@ -492,9 +463,7 @@ class BrainData:
                     "height": int(row["image_size"][0]),
                     "width": int(row["image_size"][1]),
                 }
-                area = (row["bbox"][1] - row["bbox"][0]) * (
-                    row["bbox"][-1] - row["bbox"][-2]
-                )
+                area = (row["bbox"][1] - row["bbox"][0]) * (row["bbox"][-1] - row["bbox"][-2])
                 annot_dict = (
                     {
                         "id": int(row["index"]),
@@ -511,12 +480,8 @@ class BrainData:
                 else:
                     test_images.append(image_dict)
                     test_annots.append(annot_dict)
-        train_json: dict = self._create_det_coco_annot_json(
-            images=train_images, annots=train_annots
-        )
-        test_json: dict = self._create_det_coco_annot_json(
-            images=test_images, annots=test_annots
-        )
+        train_json: dict = self._create_det_coco_annot_json(images=train_images, annots=train_annots)
+        test_json: dict = self._create_det_coco_annot_json(images=test_images, annots=test_annots)
         # create outputs json's and return its paths
         path = f"{self.IMAGES_PATH}/{out_dir}"
         if not os.path.exists(path):

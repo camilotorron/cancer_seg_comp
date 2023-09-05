@@ -12,7 +12,14 @@ from tqdm import tqdm
 
 from src.data_handling.data_augmentator import DataAugmentator
 from src.settings.settings import env
-from src.tools.tools import check_is_tumor, get_image_size, get_png_files
+from src.tools.tools import (
+    bbox_to_yoloformat,
+    check_all_black_mask,
+    check_is_tumor,
+    get_bounding_box,
+    get_image_size,
+    get_png_files,
+)
 
 
 class BrainData:
@@ -93,12 +100,12 @@ class BrainData:
             img_size = get_image_size(file_path)
             image_sizes.append(img_size)
             # compute bbox
-            bbox = self.get_bounding_box(mask_path)
+            bbox = get_bounding_box(mask_path)
             bboxs.append(bbox)
         df["image_size"] = image_sizes
         df["bbox"] = bboxs
 
-        df["yolo_bbox"] = df.apply(self.bbox_to_yoloformat, axis=1)
+        df["yolo_bbox"] = df.apply(bbox_to_yoloformat, axis=1)
 
         logger.debug("BBoxes and image_sizes computed.")
         logger.debug("Recomputing is_tumor")
@@ -216,11 +223,11 @@ class BrainData:
             img_size = get_image_size(file_path)
             image_sizes.append(img_size)
             # compute bbox
-            bbox = self.get_bounding_box(mask_path)
+            bbox = get_bounding_box(mask_path)
             bboxs.append(bbox)
         df["image_size"] = image_sizes
         df["bbox"] = bboxs
-        df["yolo_bbox"] = df.apply(self.bbox_to_yoloformat, axis=1)
+        df["yolo_bbox"] = df.apply(bbox_to_yoloformat, axis=1)
 
         logger.debug("BBoxes and image_sizes computed.")
         logger.debug("Recomputing is_tumor")
@@ -228,57 +235,34 @@ class BrainData:
         self.df = df
         logger.debug("All features computed. DF is ready.")
 
-    def get_bounding_box(self, mask_path):
-        mask = Image.open(mask_path)
-        mask_np = np.array(mask)
-        binarized_array = (mask_np > 125).astype(int)
-        segmentation = np.where(binarized_array == True)
-
-        x_min, x_max, y_min, y_max = 0, 0, 0, 0
-        if len(segmentation) != 0 and len(segmentation[1]) != 0 and len(segmentation[0]) != 0:
-            x_min = int(np.min(segmentation[1]))
-            x_max = int(np.max(segmentation[1]))
-            y_min = int(np.min(segmentation[0]))
-            y_max = int(np.max(segmentation[0]))
-
-        bbox = x_min, x_max, y_min, y_max
-        return bbox
-
-    def bbox_to_yoloformat(self, row):
-        bbox = row["bbox"]
-        imgsz = row["image_size"]
-        x_min, x_max, y_min, y_max = bbox[0], bbox[1], bbox[2], bbox[3]
-        x_center = (x_min + x_max) / 2
-        y_center = (y_min + y_max) / 2
-        width = x_max - x_min
-        height = y_max - y_min
-
-        x_center_n = x_center / imgsz[0]
-        y_center_n = y_center / imgsz[1]
-        width_n = width / imgsz[0]
-        height_n = height / imgsz[1]
-
-        yolo_bbox = (x_center_n, y_center_n, width_n, height_n)
-
-        return yolo_bbox
-
     def create_yolo_det_dataset(
         self,
-        df: pd.DataFrame,
-        data_folder: str = None,
-        BASE_DIR: str = env.YOLO_DATASET_OUTPUT,
+        df: pd.DataFrame = None,
+        folder_name: str = None,
     ) -> None:
-        if not data_folder:
-            data_folder = self.IMAGES_PATH
-        if not os.path.exists(BASE_DIR):
-            os.makedirs(BASE_DIR)
+        """
+        Creates a yolo detection dataset with annotations
+
+        Args:
+            df (pd.DataFrame, optional): Df to avoid read_data. Defaults to None.
+            folder_name (str, optional): output_folder. Defaults to None.
+
+        Raises:
+            ValueError: _description_
+        """
+        if not df:
+            df = self.df
+
+        output_folder = str(Path(self.IMAGES_PATH).joinpath(folder_name))
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
 
         subdirs = ["train", "val", "test"]
         train_count, val_count, test_count = 0, 0, 0
         for subdir in subdirs:
-            os.makedirs(os.path.join(BASE_DIR, subdir), exist_ok=True)
-
-        for index, row in df.iterrows():
+            os.makedirs(os.path.join(output_folder, subdir), exist_ok=True)
+        logger.debug(f"Copying images to {output_folder}")
+        for index, row in tqdm(df.iterrows(), total=len(df)):
             split_value = row["split"]
             if split_value not in subdirs:
                 raise ValueError(f"Invalid split value: {split_value}")
@@ -289,25 +273,48 @@ class BrainData:
             elif split_value == "test":
                 test_count += 1
             source_image_path = f'{row["dir"]}/{row["filename"]}'
-            destination_path = os.path.join(BASE_DIR, split_value, os.path.basename(row["filename"]))
+            destination_path = os.path.join(output_folder, split_value, os.path.basename(row["filename"]))
             df.at[index, "yolo_ds_original_image_path"] = destination_path
             shutil.copy2(source_image_path, destination_path)
         logger.debug(f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}")
+        df = self._create_det_annotations_txt(df=df, output_dir=output_folder)
         self.df = df
 
-    def create_det_anotations_txt(self, df: pd.DataFrame, output_dir: str):
-        for index, row in df.iterrows():
+    def _create_det_annotations_txt(self, df: pd.DataFrame, output_dir: str):
+        """
+        Creates detection annotation txt files
+
+        Args:
+            df (pd.DataFrame): dataframe to annotate
+            output_dir (str): output directory
+
+        Returns:
+            _type_: modified dataframe
+        """
+        logger.debug("Creating annotations files for object detection")
+        for index, row in tqdm(df.iterrows(), total=len(df)):
             output_path = output_dir + "/" + row["split"]
             filename = row["filename"]
             if row["bbox"] != (0, 0, 0, 0):
                 box = " ".join(map(str, row["yolo_bbox"]))
                 text = f"{0} {box}"
 
-                destination_path = self.write_to_txt(lines=text, filename=filename, output_path=output_path)
+                destination_path = self._write_to_txt(lines=text, filename=filename, output_path=output_path)
                 df.at[index, "yolo_ds_annot_txt_path"] = destination_path
-        self.df = df
+        return df
 
-    def write_to_txt(self, lines: list, filename: str, output_path: str = ".") -> str:
+    def _write_to_txt(self, lines: list, filename: str, output_path: str = ".") -> str:
+        """
+        Writes txt annotations
+
+        Args:
+            lines (list): text to write
+            filename (str): name of the file
+            output_path (str, optional): output path . Defaults to ".".
+
+        Returns:
+            str: full path of the annotation txt
+        """
         if isinstance(lines, str):
             text = lines
         base_name = filename.split(".")[0]
@@ -318,52 +325,32 @@ class BrainData:
             file.write(text)
         return full_path
 
-    def _convert_tif_to_png(self):
-        image_dir = self.IMAGES_PATH
-        image_dir_2 = f"{str(image_dir)}_png"
+    def create_yolo_seg_dataset(self, df: pd.DataFrame = None, folder_name=None):
+        """
+        Creates a yolo segmentation dataset with annotations
 
-        Path(image_dir_2).mkdir(parents=True, exist_ok=True)
+        Args:
+            df (pd.DataFrame, optional): dataframe to avoid read_data. Defaults to None.
+            folder_name (_type_, optional): name of the output folder. Defaults to None.
 
-        for subdir, _, files in os.walk(image_dir):
-            for file in files:
-                if file.endswith(".tif"):
-                    # Construct full file path
-                    full_path = os.path.join(subdir, file)
+        Raises:
+            ValueError: _description_
+        """
 
-                    # Construct destination path
-                    rel_dir = os.path.relpath(subdir, image_dir)
-                    dest_dir = os.path.join(image_dir_2, rel_dir)
-                    Path(dest_dir).mkdir(parents=True, exist_ok=True)
+        if not df:
+            df = self.df
 
-                    dest_path = os.path.join(dest_dir, file.replace(".tif", ".png"))
-
-                    # Convert image
-                    img = Image.open(full_path)
-                    img.save(dest_path, "PNG")
-
-    def export_df_to_csv(self, destination: str):
-        path = destination
-        self.df.to_csv(path)
-        return path
-
-    def create_img(self, mask, name):
-        img = Image.fromarray(np.uint8(mask), "RGB")
-        filename = f"outputs/{name}.png"
-        img.save(filename)
-
-    def create_yolo_seg_dataset(self, out_dir=None):
-        if out_dir == None:
-            out_dir = Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[3])
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+        output_folder = str(Path(self.IMAGES_PATH).joinpath(folder_name))
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
 
         subdirs = ["train", "val", "test"]
         train_count, val_count, test_count = 0, 0, 0
 
         for subdir in subdirs:
-            os.makedirs(os.path.join(out_dir, subdir), exist_ok=True)
+            os.makedirs(os.path.join(output_folder, subdir), exist_ok=True)
 
-        for index, row in self.df.iterrows():
+        for index, row in tqdm(df.iterrows(), total=len(df)):
             split_value = row["split"]
             if split_value not in subdirs:
                 raise ValueError(f"Invalid split value: {split_value}")
@@ -374,34 +361,51 @@ class BrainData:
             elif split_value == "test":
                 test_count += 1
             source_image_path = f'{row["dir"]}/{row["filename"]}'
-            destination_path = os.path.join(out_dir, split_value, os.path.basename(row["filename"]))
-            self.df.at[index, "yolo_seg_ds_original_image_path"] = destination_path
+            destination_path = os.path.join(output_folder, split_value, os.path.basename(row["filename"]))
+            df.at[index, "yolo_seg_ds_original_image_path"] = destination_path
             shutil.copy2(source_image_path, destination_path)
         logger.debug(f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}")
+        df = self._create_seg_annotations_txt(df=df, out_dir=output_folder)
+        self.df = df
 
-    def create_seg_anotations_txt(self, out_dir=None):
+    def _create_seg_annotations_txt(self, df: pd.DataFrame = None, out_dir=None) -> pd.DataFrame:
+        """
+        Create segmentation annotation txt files
+
+        Args:
+            df (pd.DataFrame, optional): dataframe. Defaults to None.
+            out_dir (_type_, optional): output folder. Defaults to None.
+
+        Returns:
+            pd.DataFrame: modified dataframe
+        """
+        logger.debug("Creating segmentation annotations files")
         if out_dir == None:
             out_dir = Path(self.IMAGES_PATH).joinpath(env.SUB_DATASETS[3])
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-        self.df["seg_anot_filepath"] = None
-        for index, row in self.df.iterrows():
-            logger.debug(f"File {index}/{len(self.df)}")
+        self.df["seg_annot_filepath"] = None
+        for index, row in tqdm(df.iterrows(), total=len(df)):
             # if row["split"] == "train":
             original_path = row["yolo_seg_ds_original_image_path"]
             mask_path = f'{row["dir"]}/{row["mask"]}'
 
-            if not self._check_all_black_mask(mask_path=mask_path):
-                text = f"0 {self._create_seg_text_anot(mask_path = mask_path)}"
-                anot_file = self._create_seg_text_file(lines=text, row=row)
-                self.df.loc[index, "seg_anot_filepath"] = anot_file
+            if not check_all_black_mask(mask_path=mask_path):
+                text = f"0 {self._create_seg_text_annot(mask_path = mask_path)}"
+                annot_file = self._create_seg_text_file(lines=text, row=row)
+                self.df.loc[index, "seg_annot_filepath"] = annot_file
+        return df
 
-    def _check_all_black_mask(self, mask_path: str) -> bool:
-        img = Image.open(mask_path).convert("L")
-        img_np = np.array(img)
-        return np.all(img_np == 0)
+    def _create_seg_text_annot(self, mask_path: str):
+        """
+        Creates segmentation txt annotations
 
-    def _create_seg_text_anot(self, mask_path: str):
+        Args:
+            mask_path (str): path of the mask
+
+        Returns:
+            _type_: annnotation text
+        """
         img = Image.open(mask_path).convert("L")
         img_np = np.array(img)
         # Binarize the image if needed
@@ -447,6 +451,41 @@ class BrainData:
                 file.write(text)
             return filename
 
+    def _convert_tif_to_png(self):
+        image_dir = self.IMAGES_PATH
+        image_dir_2 = f"{str(image_dir)}_png"
+
+        Path(image_dir_2).mkdir(parents=True, exist_ok=True)
+
+        for subdir, _, files in os.walk(image_dir):
+            for file in files:
+                if file.endswith(".tif"):
+                    # Construct full file path
+                    full_path = os.path.join(subdir, file)
+
+                    # Construct destination path
+                    rel_dir = os.path.relpath(subdir, image_dir)
+                    dest_dir = os.path.join(image_dir_2, rel_dir)
+                    Path(dest_dir).mkdir(parents=True, exist_ok=True)
+
+                    dest_path = os.path.join(dest_dir, file.replace(".tif", ".png"))
+
+                    # Convert image
+                    img = Image.open(full_path)
+                    img.save(dest_path, "PNG")
+
+    def _export_df_to_csv(self, destination: str):
+        path = destination
+        self.df.to_csv(path)
+        return path
+
+    def _create_img(self, mask, name):
+        img = Image.fromarray(np.uint8(mask), "RGB")
+        filename = f"outputs/{name}.png"
+        img.save(filename)
+
+    #############################################################
+    """
     def create_det_coco_datasets(self, out_dir=None):
         if out_dir is None:
             out_dir = env.SUB_DATASETS[4]
@@ -508,3 +547,4 @@ class BrainData:
             "images": images,
             "annotations": annots,
         }
+    """

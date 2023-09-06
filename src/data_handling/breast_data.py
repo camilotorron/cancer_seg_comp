@@ -21,7 +21,6 @@ class BreastData:
         image_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
         path = f"{self.IMAGES_PATH}/{env.BREAST_US}"
         print(path)
-        # Use os.walk to go through all directories and subdirectories
         image_files = [
             os.path.join(root, file)
             for root, dirs, files in os.walk(path)

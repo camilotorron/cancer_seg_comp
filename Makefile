@@ -2,6 +2,10 @@
 create-datasets:
 	poetry run python -m scripts.stages.create_datasets
 
+# Train yolov8 det for all datasets
+train-det:
+	poetry run python -m scripts.stages.train_yolo_det
+
 run:
 	poetry run python -m scripts.run
 

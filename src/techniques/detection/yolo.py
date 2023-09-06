@@ -1,8 +1,10 @@
-from ultralytics import YOLO
-from PIL import Image
-from src.settings.settings import env
-from torchvision.ops import nms
 import torch
+from loguru import logger
+from PIL import Image
+from torchvision.ops import nms
+from ultralytics import YOLO
+
+from src.settings.settings import env
 
 
 class Yolo:
@@ -32,9 +34,7 @@ class Yolo:
         boxes = results[0].boxes.xyxy
         confs = results[0].boxes.conf
         clss = results[0].boxes.cls
-        filtered = nms(
-            boxes=boxes, scores=confs, iou_threshold=env.DEF_YOLO_DET_THRESHOLD
-        )
+        filtered = nms(boxes=boxes, scores=confs, iou_threshold=env.DEF_YOLO_DET_THRESHOLD)
         nms_boxes = [boxes[int(i)].tolist() for i in filtered.tolist()]
         nms_confs = [confs[int(i)].tolist() for i in filtered.tolist()]
         nms_clss = [clss[int(i)].tolist() for i in filtered.tolist()]
@@ -43,11 +43,11 @@ class Yolo:
     def freeze_layer(self, trainer):
         model = trainer.model
         num_freeze = 10
-        print(f"Freezing {num_freeze} layers")
+        logger.debug(f"Freezing {num_freeze} layers")
         freeze = [f"model.{x}." for x in range(num_freeze)]  # layers to freeze
         for k, v in model.named_parameters():
             v.requires_grad = True  # train all layers
             if any(x in k for x in freeze):
-                print(f"freezing {k}")
+                logger.debug(f"freezing {k}")
                 v.requires_grad = False
-        print(f"{num_freeze} layers are freezed.")
+        logger.debug(f"{num_freeze} layers are freezed.")

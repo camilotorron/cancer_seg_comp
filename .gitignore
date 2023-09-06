@@ -1,7 +1,9 @@
 data/
 data2/
 *.pt
+
 scripts/*
+!scripts/stages/
 TODO.txt
 *.ipynb
 runs

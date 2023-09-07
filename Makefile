@@ -6,6 +6,11 @@ create-datasets:
 train-det:
 	poetry run python -m scripts.stages.train_yolo_det
 
+# Evaluate finetuned yolov8 det and SAM for full pipeline segmentation
+evaluate-det-sam:
+	poetry run python -m scripts.stages.evaluation_yolosam
+
+#############
 run:
 	poetry run python -m scripts.run
 

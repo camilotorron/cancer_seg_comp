@@ -19,7 +19,7 @@ class Environment(BaseSettings):
     }
     DEF_YOLO_DET_THRESHOLD = 0.5
     FINETUNED_YOLO = "models/finetuned_yolo.pt"
-    BRAIN_DATA = "brain_MRI_segmentation/kaggle_3m_png"
+    # BRAIN_DATA = "brain_MRI_segmentation/kaggle_3m_png"
     # BRAIN_DATA = "brain_MRI_segmentation/kaggle_3m"
     BRAIN_DATA_DIR = "datasets/brain"
     SUB_DATASETS = [
@@ -33,6 +33,17 @@ class Environment(BaseSettings):
     ]
     YOLOSEG_THRESHOLD = 0.5
     MEDSAM_PATH = "wanglab/medsam-vit-base"  # path for SamProcessor and SamModel
+    SAM_CKPTS = [
+        "models/SAM/sam_vit_b_01ec64.pth",
+        "models/SAM/sam_vit_h_4b8939.pth",
+        "models/SAM/sam_hq_vit_l.pth",
+    ]
+    SAM_HQ_CKPTS = [
+        "models/SAM/sam_hq_vit_b.pth",
+        "models/SAM/sam_hq_vit_h.pth",
+        "models/SAM/sam_hq_vit_l.pth",
+        "models/SAM/sam_hq_vit_tiny.pth",
+    ]
 
 
 env = Environment()

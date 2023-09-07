@@ -10,11 +10,14 @@ from src.settings.settings import env
 class Yolo:
     model: YOLO
 
-    def __init__(self):
-        self.model = YOLO("models/yolov8s.pt")
+    def __init__(self, model_pt=None):
+        if not model_pt:
+            self.model = YOLO("models/yolo-det/yolov8s.pt")
+        else:
+            self.model = YOLO(model_pt)
         # self.model.add_callback("on_train_start", self.freeze_layer)
 
-    def train(self, data: str, epochs: int = 30, imgsz: int = 256):
+    def train(self, data: str, epochs: int = 20, imgsz: int = 256):
         self.model.train(
             data=data,
             epochs=epochs,

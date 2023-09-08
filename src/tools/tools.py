@@ -113,3 +113,18 @@ def bbox_to_yoloformat(row):
     yolo_bbox = (x_center_n, y_center_n, width_n, height_n)
 
     return yolo_bbox
+
+
+def generate_black_mask(h: int = 256, w: int = 256):
+    """
+    Generate a black mask of size hxw
+
+    Args:
+        h (int, optional): height. Defaults to 256.
+        w (int, optional): width. Defaults to 256.
+
+    Returns:
+        _type_: np array of the mask
+    """
+    zero_array = np.zeros((1, h, w), dtype=np.int)
+    return zero_array

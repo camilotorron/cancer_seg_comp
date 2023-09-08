@@ -1,19 +1,16 @@
-from PIL import Image
-import numpy as np
+from typing import Union
 
-from sklearn.metrics import precision_score, recall_score
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+from skimage.metrics import adapted_rand_error
 from sklearn.metrics import (
     adjusted_rand_score,
-    jaccard_score,
     f1_score,
+    jaccard_score,
     precision_score,
     recall_score,
 )
-from skimage.metrics import adapted_rand_error
-import matplotlib.pyplot as plt
-
-
-from typing import Union
 
 
 class Evaluator:
@@ -27,49 +24,36 @@ class Evaluator:
         if isinstance(pred_mask, str):
             pred_mask = Image.open(pred_mask)
         # Convert to numpy arrays
-        # self.create_comparison_image(true_mask=true_mask, pred_mask=pred_mask)
-        # breakpoint()
         self.true_mask = np.array(true_mask).flatten()
         self.pred_mask = np.array(pred_mask).flatten()
+        if np.isin([True, False], self.pred_mask).all():
+            self.pred_mask = np.where(self.pred_mask, 255, 0).astype(np.uint8)
 
     def iou(self):
         """
         Compute Intersection over Union (IoU).
         """
-        if np.all(self.true_mask == self.pred_mask):
-            return 1.0
-        else:
-            return jaccard_score(
-                y_true=self.true_mask,
-                y_pred=self.pred_mask,
-                pos_label=255,
-                average="binary",
-                zero_division=0,
-            )
+        return jaccard_score(
+            y_true=self.true_mask,
+            y_pred=self.pred_mask,
+            pos_label=255,
+            average="binary",
+            zero_division=0,
+        )
 
     def dice_coefficient(self):
         """
         Compute Dice Coefficient.
         """
-        # intersection = np.sum(self.true_mask * self.pred_mask)
-        # return (2.0 * intersection) / (np.sum(self.true_mask) + np.sum(self.pred_mask))
-        # Compute the intersection
-        if np.all(self.true_mask == self.pred_mask):
-            return 1.0
-        else:
-            true_mask_norm = self.true_mask / 255
-            pred_mask_norm = self.pred_mask / 255
-            intersection = np.logical_and(
-                true_mask_norm,
-                pred_mask_norm,
-            ).sum()
+        true_mask_norm = self.true_mask / 255
+        pred_mask_norm = self.pred_mask / 255
+        intersection = np.logical_and(
+            true_mask_norm,
+            pred_mask_norm,
+        ).sum()
 
-            # Compute the Dice Score
-            return (
-                2 * intersection / (true_mask_norm.sum() + pred_mask_norm.sum())
-                if intersection != 0
-                else 0
-            )
+        # Compute the Dice Score
+        return 2 * intersection / (true_mask_norm.sum() + pred_mask_norm.sum()) if intersection != 0 else 0
 
     def precision(self):
         TP = np.logical_and(self.true_mask, self.pred_mask).sum()
@@ -98,7 +82,7 @@ class Evaluator:
             self.recall(),
         )
 
-    def create_comparison_image(self, true_mask, pred_mask, filename="image.png"):
+    def _create_comparison_image(self, true_mask, pred_mask, filename="image.png"):
         """
         Create an image comparing true_mask and pred_mask side by side.
 

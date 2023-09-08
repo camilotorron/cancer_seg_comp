@@ -1,4 +1,3 @@
-import torch
 from loguru import logger
 from PIL import Image
 from torchvision.ops import nms
@@ -41,7 +40,15 @@ class Yolo:
         nms_boxes = [boxes[int(i)].tolist() for i in filtered.tolist()]
         nms_confs = [confs[int(i)].tolist() for i in filtered.tolist()]
         nms_clss = [clss[int(i)].tolist() for i in filtered.tolist()]
-        return nms_boxes, nms_confs, nms_clss
+
+        filtered_boxes, filtered_confs, filtered_clss = [], [], []
+        for box, conf, cls in zip(nms_boxes, nms_confs, nms_clss):
+            if conf > env.DEF_YOLO_DET_THRESHOLD:
+                filtered_boxes.append(box)
+                filtered_confs.append(conf)
+                filtered_clss.append(cls)
+
+        return filtered_boxes, filtered_confs, filtered_clss
 
     def freeze_layer(self, trainer):
         model = trainer.model

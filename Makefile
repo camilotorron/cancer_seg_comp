@@ -6,19 +6,24 @@ create-datasets:
 train-det:
 	poetry run python -m scripts.stages.train_yolo_det
 
+# Inference of finetuned yolov8 det
+infer-det:
+	poetry run python -m scripts.stages.inference_testdf_det
+
 # Evaluate finetuned yolov8 det and SAM for full pipeline segmentation
 evaluate-det-sam:
-	poetry run python -m scripts.stages.evaluation_yolosam
+	poetry run python -m scripts.stages.inference_testdf_seg_sam
+
 
 #############
-run:
-	poetry run python -m scripts.run
+# run:
+# 	poetry run python -m scripts.run
 
-yolosam:
-	poetry run python -m scripts.test_yolo_sam
+# yolosam:
+# 	poetry run python -m scripts.test_yolo_sam
 
-evaluate-yolosam:
-	poetry run python -m scripts.evaluate_yolo_sam
+# evaluate-yolosam:
+# 	poetry run python -m scripts.evaluate_yolo_sam
 
-pruebas:
-	poetry run python -m scripts.pruebas
+# pruebas:
+# 	poetry run python -m scripts.pruebas

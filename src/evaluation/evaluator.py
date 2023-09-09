@@ -1,16 +1,7 @@
-from typing import Union
-
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
-from skimage.metrics import adapted_rand_error
-from sklearn.metrics import (
-    adjusted_rand_score,
-    f1_score,
-    jaccard_score,
-    precision_score,
-    recall_score,
-)
+from sklearn.metrics import jaccard_score
 
 
 class Evaluator:
@@ -28,6 +19,17 @@ class Evaluator:
         self.pred_mask = np.array(pred_mask).flatten()
         if np.isin([True, False], self.pred_mask).all():
             self.pred_mask = np.where(self.pred_mask, 255, 0).astype(np.uint8)
+
+        if self.true_mask.shape != self.pred_mask.shape:
+            self.true_mask = (
+                0.2989 * np.array(true_mask)[:, :, 0]
+                + 0.5870 * np.array(true_mask)[:, :, 1]
+                + 0.1140 * np.array(true_mask)[:, :, 2]
+            ).flatten()
+            self.true_mask = np.where(self.true_mask < 123, 0, 255)
+
+        if np.isin([True, False], self.true_mask).all():
+            self.true_mask = np.where(self.true_mask, 255, 0).astype(np.uint8)
 
     def iou(self):
         """

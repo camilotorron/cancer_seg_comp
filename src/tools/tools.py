@@ -1,6 +1,9 @@
+import ast
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from loguru import logger
 from PIL import Image
 
@@ -128,3 +131,109 @@ def generate_black_mask(h: int = 256, w: int = 256):
     """
     zero_array = np.zeros((1, h, w), dtype=np.int)
     return zero_array
+
+
+def compute_mean_metrics(df: pd.DataFrame) -> pd.DataFrame:
+    ious, dices, f1s, precs, recs = [], [], [], [], []
+    for column in [
+        "sam_b_iou",
+        "sam_b_dice",
+        "sam_b_f1",
+        "sam_b_prec",
+        "sam_b_rec",
+        "sam_l_iou",
+        "sam_l_dice",
+        "sam_l_f1",
+        "sam_l_prec",
+        "sam_l_rec",
+        "sam_h_iou",
+        "sam_h_dice",
+        "sam_h_f1",
+        "sam_h_prec",
+        "sam_h_rec",
+        "medsam_iou",
+        "medsam_dice",
+        "medsam_f1",
+        "medsam_prec",
+        "medsam_rec",
+    ]:
+        mean_value = round(df[df[column] != 0.0][column].mean(), 3)
+        if "iou" in column:
+            ious.append(mean_value)
+        elif "dice" in column:
+            dices.append(mean_value)
+        elif "f1" in column:
+            f1s.append(mean_value)
+        elif "prec" in column:
+            precs.append(mean_value)
+        elif "rec" in column:
+            recs.append(mean_value)
+
+    data = {"iou_mean": ious, "dice_mean": dices, "f1_mean": f1s, "prec_mean": precs, "rec_mean": recs}
+    row_indices = ["sam_b", "sam_l", "sam_h", "med_sam"]
+    mean_df = pd.DataFrame(data, index=row_indices)
+    return mean_df
+
+
+def compute_tnr_tpr(df: pd.DataFrame) -> float:
+    no_tumor_df = df[df["is_tumor"] == False]
+    no_tumor_df.loc[:, "pred_boxes"] = no_tumor_df["pred_boxes"].apply(ast.literal_eval)
+    tn = len(no_tumor_df[no_tumor_df["pred_boxes"].apply(lambda x: x == [])])
+    tnfp = len(no_tumor_df)
+    tnr = tn / tnfp
+
+    tumor_df = df[df["is_tumor"] == True]
+    tumor_df.loc[:, "pred_boxes"] = tumor_df["pred_boxes"].apply(ast.literal_eval)
+    tp = len(tumor_df[tumor_df["pred_boxes"].apply(lambda x: x != [])])
+    tpfp = len(tumor_df)
+    rec = tp / tpfp
+    return tnr, rec
+
+
+def plot_is_tumor_distribution(dfs: list[pd.DataFrame], data_names: list[str] = None):
+    fig, axes = plt.subplots(1, len(dfs), figsize=(16, 8))
+    plt.subplots_adjust(wspace=0.4)
+    if len(dfs) == 1:
+        axes = [axes]
+    for ax, df, data_name in zip(axes, dfs, data_names):
+        value_counts = df["is_tumor"].value_counts().rename({True: "Sí", False: "No"})
+        labels = [f"{label} ({count})" for label, count in zip(value_counts.index, value_counts)]
+
+        ax.pie(value_counts, labels=labels, autopct="%1.2f%%", startangle=90, colors=["green", "red"])
+        ax.set_title(f'Distribución de "is_tumor" en {data_name}')
+
+    plt.show()
+
+
+def plot_bbox_area_distribution(dfs: list[pd.DataFrame], data_names: list[str]):
+    fig, axes = plt.subplots(1, len(dfs), figsize=(18, 8))
+    plt.subplots_adjust(wspace=0.4)  # Adjust the spacing between subplots
+    if len(dfs) == 1:
+        axes = [axes]
+    for ax, df, data_name in zip(axes, dfs, data_names):
+        areas = df["bbox"].apply(lambda x: eval(x))
+        areas = areas.apply(lambda x: (x[2] - x[0]) * (x[3] - x[1]))
+        areas = areas[areas > 0]
+
+        ax.hist(areas, bins=10, color="blue", edgecolor="black")
+        ax.set_title(f'Área de "bbox" en {data_name}')
+        ax.set_xlabel("Área [píxeles cuadrados]")
+        ax.set_ylabel("Frecuencia [unidades]")
+    plt.show()
+
+
+def plot_split_distribution(dfs: list[pd.DataFrame], data_names: list[str]):
+    fig, axes = plt.subplots(1, len(dfs), figsize=(18, 8))
+    plt.subplots_adjust(wspace=0.4)
+    if len(dfs) == 1:
+        axes = [axes]
+    desired_order = ["train", "val", "test"]
+    for ax, df, data_name in zip(axes, dfs, data_names):
+        value_counts = df["split"].value_counts().reindex(desired_order)
+        total = sum(value_counts)
+        percentages = (value_counts / total) * 100
+        ax.bar(percentages.index, percentages, color=["blue", "green", "red"], edgecolor="black")
+        ax.set_title(f'Distribución de "split" en {data_name}')
+        ax.set_xlabel("Split [train/val/test]")
+        ax.set_ylabel("Porcentaje del total [%]")
+    plt.show()

@@ -12,6 +12,8 @@ models
 *.tif
 *.csv
 datasets
+!notebooks/results_analysis.ipynb
+!notebooks/EDA.ipynb
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

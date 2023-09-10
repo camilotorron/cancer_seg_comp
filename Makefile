@@ -14,7 +14,11 @@ infer-det:
 evaluate-det-sam:
 	poetry run python -m scripts.stages.inference_testdf_seg_sam
 
+# Train yolo seg for all datasets
+train-seg:
+	poetry run python -m scripts.stages.train_yolo_seg
 
+	
 #############
 # run:
 # 	poetry run python -m scripts.run

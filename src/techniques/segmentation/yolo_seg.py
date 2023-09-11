@@ -1,7 +1,8 @@
-from ultralytics import YOLO
-from PIL import Image, ImageDraw
-from src.settings.settings import env
 import numpy as np
+from PIL import Image, ImageDraw
+from ultralytics import YOLO
+
+from src.settings.settings import env
 
 
 class YoloSeg:
@@ -10,16 +11,19 @@ class YoloSeg:
     def __init__(self, path: str = "models/yolov8s-seg.pt"):
         self.model = YOLO(path)
 
-    def train(self, data: str, epochs: int = 30, imgsz: int = 256):
+    def train(self, data: str, model="models/yolov8s-seg.pt", epochs: int = 20, imgsz: int = 256, name="train"):
         results = self.model.train(
+            task="segment",
+            model=model,
             data=data,
             epochs=epochs,
             imgsz=imgsz,
             device=0,
             patience=5,
             optimizer="Adam",
+            name=name,
+            pretrained=True,
         )
-        return results
 
     def inference(self, image: str, checkout_path: str):
         self.model = YOLO(checkout_path)

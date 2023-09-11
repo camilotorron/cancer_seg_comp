@@ -1,7 +1,7 @@
 data/
 data2/
 *.pt
-
+src/techniques/detection/FRCNN.py
 scripts/*
 !scripts/stages/
 TODO.txt
@@ -176,3 +176,5 @@ cython_debug/
 #.idea/
 .vscode/settings.json
 scripts/run.py
+src/techniques/detection/FRCNN.py
+src/techniques/detection/FRCNN.py

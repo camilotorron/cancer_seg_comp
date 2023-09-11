@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 from PIL import Image
+from sklearn.metrics import average_precision_score
 
 
 def get_png_files(path):
@@ -237,3 +238,66 @@ def plot_split_distribution(dfs: list[pd.DataFrame], data_names: list[str]):
         ax.set_xlabel("Split [train/val/test]")
         ax.set_ylabel("Porcentaje del total [%]")
     plt.show()
+
+
+def calculate_det_metrics_at_thresholds(df: pd.DataFrame, thresholds: list = [0.4, 0.5, 0.7, 0.9]) -> pd.DataFrame:
+    results = []
+
+    for threshold in thresholds:
+        y_true, y_scores, iou_values, iou_values, f1_values = [], [], [], [], []
+
+        for index, row in df.iterrows():
+            if pd.isna(row["pred_boxes"]) or not eval(row["pred_confs"]):
+                continue
+
+            true_bbox = eval(row["bbox"])  # Format: [xmin, xmax, ymin, ymax]
+            pred_bboxes = eval(row["pred_boxes"])  # Format: [[xmin, ymin, xmax, ymax], ...]
+            pred_confs = eval(row["pred_confs"])  # Format: [conf1, conf2, ...]
+
+            best_pred_index = pred_confs.index(max(pred_confs))
+            best_pred_bbox = pred_bboxes[best_pred_index]
+            best_pred_bbox = [best_pred_bbox[0], best_pred_bbox[2], best_pred_bbox[1], best_pred_bbox[3]]
+
+            true_area = (true_bbox[1] - true_bbox[0]) * (true_bbox[3] - true_bbox[2])
+            pred_area = (best_pred_bbox[1] - best_pred_bbox[0]) * (best_pred_bbox[3] - best_pred_bbox[2])
+
+            x_overlap = max(0, min(true_bbox[1], best_pred_bbox[1]) - max(true_bbox[0], best_pred_bbox[0]))
+            y_overlap = max(0, min(true_bbox[3], best_pred_bbox[3]) - max(true_bbox[2], best_pred_bbox[2]))
+            intersection_area = x_overlap * y_overlap
+
+            # Calculate the union area
+            union_area = true_area + pred_area - intersection_area
+
+            # Calculate IoU
+            iou = intersection_area / union_area if union_area != 0 else 0
+            iou_values.append(iou)
+
+            # Prepare data for mAP and F1-Score calculation
+            is_true_positive = int(iou >= threshold)
+            y_true.append(is_true_positive)
+            y_scores.append(max(pred_confs))
+
+            # Calculate F1-Score for this instance
+            if is_true_positive:
+                f1 = 1  # TP, so F1-Score is 1
+            else:
+                if pred_area > 0:
+                    f1 = 0  # FP, so F1-Score is 0
+                else:
+                    f1 = 0  # FN, so F1-Score is 0
+            f1_values.append(f1)
+
+        mAP = average_precision_score(y_true, y_scores)
+
+        # Calculate average IoU and F1-Score
+        avg_iou = np.mean(iou_values)
+        avg_f1 = np.mean(f1_values)
+
+        results.append({"threshold": threshold, "IoU": round(avg_iou, 3), "mAP": round(mAP, 3), "F1": round(avg_f1, 3)})
+
+    results_df = pd.DataFrame(results)
+
+    # Convert results to DataFrame
+    results_df = pd.DataFrame(results)
+
+    return results_df

@@ -74,12 +74,13 @@ def create_braindata_datasets():
 
 
 def create_breastdata_datasets():
-    # Create BreastData instance
-    basedata = BreastData()
-    # Read base data an export to Dataframe
-    basedata.read_data()
-    csv_path_base = f"{basedata.IMAGES_PATH}/base_df.csv"
-    basedata.df.to_csv(csv_path_base, index=False)
+    pass
+    # # Create BreastData instance
+    # basedata = BreastData()
+    # # Read base data an export to Dataframe
+    # basedata.read_data()
+    # csv_path_base = f"{basedata.IMAGES_PATH}/base_df.csv"
+    # basedata.df.to_csv(csv_path_base, index=False)
 
     # # Create BreastData instance
     # augment4data = BrainData(

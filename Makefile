@@ -18,6 +18,10 @@ evaluate-det-sam:
 train-seg:
 	poetry run python -m scripts.stages.train_yolo_seg
 
+# Evaluate yolo seg for all datasets
+evaluate-seg:
+	poetry run python -m scripts.stages.inference_testdf_yoloseg
+
 	
 #############
 # run:

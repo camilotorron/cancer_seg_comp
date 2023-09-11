@@ -11,10 +11,30 @@ from src.techniques.segmentation.yolo_seg import YoloSeg
 
 def train(data: dict = None):
     data_name = data.get("yml").split("/")[-1].split("_")[0]
-    logger.debug(f"Training with Yolov8-seg with |{data_name}| dataset")
-    yoloseg = YoloSeg()
-    metrics = yoloseg.train(data=data.get("yml"))
-    return metrics
+    yoloseg_ckpt = [
+        "models/yolo-seg/yolov8s-seg.pt",
+        "models/yolo-seg/yolov8m-seg.pt",
+        "models/yolo-seg/yolov8l-seg.pt",
+    ]
+    for model in yoloseg_ckpt:
+        model_name = model.split("/")[-1]
+
+        logger.debug(f"Training {model_name} with |{data_name}| dataset")
+
+        experiment_name = get_experiment_name(model=model)
+        yoloseg = YoloSeg(path=model)
+        _ = yoloseg.train(data=data.get("yml"), model=model, name=experiment_name, epochs=20)
+
+
+def get_experiment_name(model: str) -> str:
+    suffix = ""
+    if "v8s" in model:
+        suffix = "v8s"
+    elif "v8m" in model:
+        suffix = "v8m"
+    elif "v8l" in model:
+        suffix = "v8l"
+    return f"train_{suffix}"
 
 
 if __name__ == "__main__":
@@ -25,8 +45,4 @@ if __name__ == "__main__":
     ]
     metrics_list = []
     for data in yolo_data:
-        metrics_list.append(train(data=data))
-    breakpoint()
-    # Save to file
-    with open("datasets/brain/train_seg_result.json", "w") as f:
-        json.dump(metrics_list, f)
+        train(data=data)

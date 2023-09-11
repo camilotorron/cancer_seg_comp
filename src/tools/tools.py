@@ -10,6 +10,15 @@ from sklearn.metrics import average_precision_score
 
 
 def get_png_files(path):
+    """
+    Return a list of all png files in a directory
+
+    Args:
+        path (_type_): directory path
+
+    Returns:
+        _type_: list of files
+    """
     tif_files = []
     for root, dirs, files in os.walk(path):
         for file in files:
@@ -21,6 +30,15 @@ def get_png_files(path):
 
 
 def get_tif_files(path):
+    """
+    Return a list of all tif files in a directory
+
+    Args:
+        path (_type_): directory path
+
+    Returns:
+        _type_: list of files
+    """
     tif_files = []
     for root, dirs, files in os.walk(path):
         for file in files:
@@ -32,6 +50,15 @@ def get_tif_files(path):
 
 
 def get_image_size(filepath: str):
+    """
+    Get image size of an image
+
+    Args:
+        filepath (str): image path
+
+    Returns:
+        _type_: image size (width and height)
+    """
     with Image.open(filepath) as img:
         return img.size  # width, height
 

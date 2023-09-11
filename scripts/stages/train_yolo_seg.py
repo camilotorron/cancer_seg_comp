@@ -21,7 +21,7 @@ def train(data: dict = None):
 
         logger.debug(f"Training {model_name} with |{data_name}| dataset")
 
-        experiment_name = get_experiment_name(model=model)
+        experiment_name = f"{data_name}_{get_experiment_name(model=model)}"
         yoloseg = YoloSeg(path=model)
         _ = yoloseg.train(data=data.get("yml"), model=model, name=experiment_name, epochs=20)
 

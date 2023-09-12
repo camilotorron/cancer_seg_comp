@@ -328,3 +328,64 @@ def calculate_det_metrics_at_thresholds(df: pd.DataFrame, thresholds: list = [0.
     results_df = pd.DataFrame(results)
 
     return results_df
+
+
+def compute_mean_metrics_yoloseg(df: pd.DataFrame) -> pd.DataFrame:
+    ious, dices, f1s, precs, recs = [], [], [], [], []
+    for column in [
+        "v8s_iou",
+        "v8s_dice",
+        "v8s_f1",
+        "v8s_prec",
+        "v8s_rec",
+        "v8m_iou",
+        "v8m_dice",
+        "v8m_f1",
+        "v8m_prec",
+        "v8m_rec",
+        "v8l_iou",
+        "v8l_dice",
+        "v8l_f1",
+        "v8l_prec",
+        "v8l_rec",
+    ]:
+        mean_value = round(df[df[column] != 0.0][column].mean(), 3)
+        if "iou" in column:
+            ious.append(mean_value)
+        elif "dice" in column:
+            dices.append(mean_value)
+        elif "f1" in column:
+            f1s.append(mean_value)
+        elif "prec" in column:
+            precs.append(mean_value)
+        elif "rec" in column:
+            recs.append(mean_value)
+
+    data = {"iou_mean": ious, "dice_mean": dices, "f1_mean": f1s, "prec_mean": precs, "rec_mean": recs}
+    row_indices = ["v8s", "v8m", "v8l"]
+    mean_df = pd.DataFrame(data, index=row_indices)
+    return mean_df
+
+
+def compute_tnr_tpr_yoloseg(df: pd.DataFrame) -> pd.DataFrame:
+    metrics_list = []
+    models = ["v8s", "v8m", "v8l"]
+    iou_columns = ["v8s_iou", "v8m_iou", "v8l_iou"]
+
+    for model, iou_col in zip(models, iou_columns):
+        no_tumor_df = df[df["is_tumor"] == False]
+        tn = len(no_tumor_df[no_tumor_df[iou_col] == 0])
+        tnfp = len(no_tumor_df)
+        tnr = tn / tnfp if tnfp != 0 else 0
+        tumor_df = df[df["is_tumor"] == True]
+
+        tp = len(tumor_df[tumor_df[iou_col] != 0])
+        tpfn = len(tumor_df)
+
+        tpr = tp / tpfn if tpfn != 0 else 0
+
+        metrics_list.append({"Model": model, "TNR": tnr, "TPR": tpr})
+
+    metrics_df = pd.DataFrame(metrics_list)
+
+    return metrics_df

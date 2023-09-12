@@ -27,11 +27,7 @@ class YoloSeg:
 
     def inference(self, image: str, checkout_path: str):
         self.model = YOLO(checkout_path)
-        # image_pil = Image.open(image)
-        # results = self.model.predict(source=image_pil, save=False)
-        results = self.model.predict(source=image, save=False)
-        # imgs = ["TCGA_HT_8114_19981030_19.png", "TCGA_CS_4942_19970222_13.png"]
-        # results = self.model.predict(source=imgs, save=True)
+        results = self.model.predict(source=image, save=False, verbose=False)
         return self._process_results(results)
 
     def _process_results(self, results):

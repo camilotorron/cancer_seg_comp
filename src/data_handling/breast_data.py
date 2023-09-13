@@ -1,12 +1,14 @@
-from src.settings.settings import env
 import os
 import shutil
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from PIL import Image
 
+from src.settings.settings import env
 
-class DataHandler:
+
+class BreastData:
     IMAGES_PATH: str
     df: pd.DataFrame
 
@@ -19,7 +21,6 @@ class DataHandler:
         image_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
         path = f"{self.IMAGES_PATH}/{env.BREAST_US}"
         print(path)
-        # Use os.walk to go through all directories and subdirectories
         image_files = [
             os.path.join(root, file)
             for root, dirs, files in os.walk(path)
@@ -71,11 +72,7 @@ class DataHandler:
         mask_np = np.array(mask)
         segmentation = np.where(mask_np == 1)
         bbox = 0, 0, 0, 0
-        if (
-            len(segmentation) != 0
-            and len(segmentation[1]) != 0
-            and len(segmentation[0]) != 0
-        ):
+        if len(segmentation) != 0 and len(segmentation[1]) != 0 and len(segmentation[0]) != 0:
             x_min = int(np.min(segmentation[1]))
             x_max = int(np.max(segmentation[1]))
             y_min = int(np.min(segmentation[0]))
@@ -135,14 +132,10 @@ class DataHandler:
             elif split_value == "test":
                 test_count += 1
             source_image_path = row["file"]
-            destination_path = os.path.join(
-                BASE_DIR, split_value, os.path.basename(row["filename"])
-            )
+            destination_path = os.path.join(BASE_DIR, split_value, os.path.basename(row["filename"]))
             df.at[index, "yolo_ds_original_image_path"] = destination_path
             shutil.copy2(source_image_path, destination_path)
-        print(
-            f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}"
-        )
+        print(f"Train images: {train_count}\nVal images: {val_count}\nTest images: {test_count}")
         self.df = df
 
     def create_anotations_txt(self, df: pd.DataFrame):
@@ -160,9 +153,7 @@ class DataHandler:
                 box = " ".join(map(str, bbox))
                 text = f"{diagnostic} {box}"
                 texts.append(text)
-            destination_path = self.write_to_txt(
-                lines=texts, filename=filename, output_path=output_path
-            )
+            destination_path = self.write_to_txt(lines=texts, filename=filename, output_path=output_path)
             df.at[index, "yolo_ds_annot_txt_path"] = destination_path
         self.df = df
 

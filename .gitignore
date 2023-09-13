@@ -1,7 +1,9 @@
 data/
 data2/
 *.pt
+src/techniques/detection/FRCNN.py
 scripts/*
+!scripts/stages/
 TODO.txt
 *.ipynb
 runs
@@ -10,6 +12,8 @@ models
 *.tif
 *.csv
 datasets
+!notebooks/results_analysis.ipynb
+!notebooks/EDA.ipynb
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -172,3 +176,5 @@ cython_debug/
 #.idea/
 .vscode/settings.json
 scripts/run.py
+src/techniques/detection/FRCNN.py
+src/techniques/detection/FRCNN.py

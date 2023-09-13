@@ -1,18 +1,22 @@
-from ultralytics import YOLO
+from loguru import logger
 from PIL import Image
-from src.settings.settings import env
 from torchvision.ops import nms
-import torch
+from ultralytics import YOLO
+
+from src.settings.settings import env
 
 
 class Yolo:
     model: YOLO
 
-    def __init__(self):
-        self.model = YOLO("models/yolov8s.pt")
+    def __init__(self, model_pt=None):
+        if not model_pt:
+            self.model = YOLO("models/yolo-det/yolov8s.pt")
+        else:
+            self.model = YOLO(model_pt)
         # self.model.add_callback("on_train_start", self.freeze_layer)
 
-    def train(self, data: str, epochs: int = 30, imgsz: int = 256):
+    def train(self, data: str, epochs: int = 20, imgsz: int = 256):
         self.model.train(
             data=data,
             epochs=epochs,
@@ -32,22 +36,28 @@ class Yolo:
         boxes = results[0].boxes.xyxy
         confs = results[0].boxes.conf
         clss = results[0].boxes.cls
-        filtered = nms(
-            boxes=boxes, scores=confs, iou_threshold=env.DEF_YOLO_DET_THRESHOLD
-        )
+        filtered = nms(boxes=boxes, scores=confs, iou_threshold=env.DEF_YOLO_DET_THRESHOLD)
         nms_boxes = [boxes[int(i)].tolist() for i in filtered.tolist()]
         nms_confs = [confs[int(i)].tolist() for i in filtered.tolist()]
         nms_clss = [clss[int(i)].tolist() for i in filtered.tolist()]
-        return nms_boxes, nms_confs, nms_clss
+
+        filtered_boxes, filtered_confs, filtered_clss = [], [], []
+        for box, conf, cls in zip(nms_boxes, nms_confs, nms_clss):
+            if conf > env.DEF_YOLO_DET_THRESHOLD:
+                filtered_boxes.append(box)
+                filtered_confs.append(conf)
+                filtered_clss.append(cls)
+
+        return filtered_boxes, filtered_confs, filtered_clss
 
     def freeze_layer(self, trainer):
         model = trainer.model
         num_freeze = 10
-        print(f"Freezing {num_freeze} layers")
+        logger.debug(f"Freezing {num_freeze} layers")
         freeze = [f"model.{x}." for x in range(num_freeze)]  # layers to freeze
         for k, v in model.named_parameters():
             v.requires_grad = True  # train all layers
             if any(x in k for x in freeze):
-                print(f"freezing {k}")
+                logger.debug(f"freezing {k}")
                 v.requires_grad = False
-        print(f"{num_freeze} layers are freezed.")
+        logger.debug(f"{num_freeze} layers are freezed.")

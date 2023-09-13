@@ -1,4 +1,4 @@
-# Create all datasets for object detection and instance segmentation for Breast and Brain data
+# Create all datasets for object detection and instance segmentation for Brain data
 create-datasets:
 	poetry run python -m scripts.stages.create_datasets
 

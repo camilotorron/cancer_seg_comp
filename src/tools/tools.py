@@ -64,8 +64,6 @@ def get_image_size(filepath: str):
 
 
 def check_is_tumor(mask_path: str) -> bool:
-    # if mask_path.split("/")[-1] == "None":
-    #     breakpoint()
     try:
         mask = Image.open(mask_path)
         mask_np = np.array(mask)

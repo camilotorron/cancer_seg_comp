@@ -25,8 +25,8 @@ def inferece_yoloseg(data: dict):
             mask_path = f'{row["dir"]}/{row["mask"]}'
             yoloseg = YoloSeg(path=model)
             masks = yoloseg.inference(image=image_path, checkout_path=model)
-            if len(masks) > 1:
-                breakpoint()
+            # if len(masks) > 1:
+            #     breakpoint()
 
             evaluator = Evaluator(true_mask=mask_path, pred_mask=masks)
             iou, dice, f1, prec, rec = (

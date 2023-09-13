@@ -216,8 +216,8 @@ class BrainData:
             mask_path = f"{row['dir']}/{row['mask']}"
             file_path = f"{row['dir']}/{row['filename']}"
 
-            if not os.path.exists(file_path) or not os.path.exists(file_path):
-                breakpoint()
+            # if not os.path.exists(file_path) or not os.path.exists(file_path):
+            #     breakpoint()
 
             # compute img size
             img_size = get_image_size(file_path)

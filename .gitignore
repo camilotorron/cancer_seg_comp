@@ -5,6 +5,7 @@ src/techniques/detection/FRCNN.py
 scripts/*
 !scripts/stages/
 TODO.txt
+src/data_handling/breast_data.py
 *.ipynb
 runs
 models

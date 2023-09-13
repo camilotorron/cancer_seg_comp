@@ -39,10 +39,6 @@ def inference_braindata(data: dict = None) -> None:
     logger.debug(f"Results exported to {data_name}")
 
 
-def inference_breastdata():
-    pass
-
-
 if __name__ == "__main__":
     brain_data = [
         {
@@ -60,5 +56,3 @@ if __name__ == "__main__":
     ]
     for data in brain_data:
         results_df = inference_braindata(data=data)
-
-    inference_breastdata()

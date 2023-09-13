@@ -56,10 +56,6 @@ def inference_braindata(data: str = None, models: dict = None) -> None:
     logger.debug(f"Results exported to {data_name}")
 
 
-def inference_breastdata():
-    pass
-
-
 if __name__ == "__main__":
     brain_data = [
         "datasets/brain/base_df_yolodet_inference.csv",
@@ -69,5 +65,3 @@ if __name__ == "__main__":
 
     for data in brain_data:
         results_df = inference_braindata(data=data, models=env.SAM_BASE_PATHS_EXPERIMENTS)
-
-    inference_breastdata()

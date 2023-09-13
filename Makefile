@@ -22,4 +22,8 @@ train-seg:
 evaluate-seg:
 	poetry run python -m scripts.stages.inference_testdf_yoloseg
 
+# Execute time experiment
+time-exp:
+	poetry run python -m scripts.stages.time_experiment
+
 	
